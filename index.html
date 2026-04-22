@@ -1,0 +1,346 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Calendar as CalendarIcon, 
+  Plus, 
+  ChevronLeft, 
+  ChevronRight, 
+  Dumbbell, 
+  Flame, 
+  Clock, 
+  CheckCircle2,
+  Trash2,
+  BarChart3
+} from 'lucide-react';
+
+// --- Utils ---
+const formatMonth = (date) => {
+  return new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long' }).format(date);
+};
+
+const getDaysInMonth = (year, month) => {
+  return new Date(year, month + 1, 0).getDate();
+};
+
+const getFirstDayOfMonth = (year, month) => {
+  return new Date(year, month, 1).getDay();
+};
+
+const App = () => {
+  // --- State ---
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [workouts, setWorkouts] = useState(() => {
+    const saved = localStorage.getItem('my_workout_data');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedDay, setSelectedDay] = useState(null);
+  
+  // New Workout Form State
+  const [newWorkout, setNewWorkout] = useState({
+    type: '웨이트',
+    duration: 60,
+    intensity: '보통',
+    memo: ''
+  });
+
+  // --- Effects ---
+  useEffect(() => {
+    localStorage.setItem('my_workout_data', JSON.stringify(workouts));
+  }, [workouts]);
+
+  // --- Handlers ---
+  const handlePrevMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  };
+
+  const handleDayClick = (day) => {
+    setSelectedDay(day);
+    setIsModalOpen(true);
+  };
+
+  const addWorkout = () => {
+    const workoutDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDay).toISOString().split('T')[0];
+    const entry = {
+      id: Date.now(),
+      date: workoutDate,
+      ...newWorkout
+    };
+    setWorkouts([...workouts, entry]);
+    setIsModalOpen(false);
+    setNewWorkout({ type: '웨이트', duration: 60, intensity: '보통', memo: '' });
+  };
+
+  const deleteWorkout = (id) => {
+    setWorkouts(workouts.filter(w => w.id !== id));
+  };
+
+  // --- Derived Data ---
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth();
+  const daysInMonth = getDaysInMonth(currentYear, currentMonth);
+  const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
+
+  const monthWorkouts = useMemo(() => {
+    const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+    return workouts.filter(w => w.date.startsWith(monthStr));
+  }, [workouts, currentYear, currentMonth]);
+
+  const totalDuration = monthWorkouts.reduce((acc, curr) => acc + Number(curr.duration), 0);
+  const workoutCount = monthWorkouts.length;
+
+  // --- Render Helpers ---
+  const renderCalendar = () => {
+    const days = [];
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+
+    // Header (Weekdays)
+    const headers = weekdays.map(d => (
+      <div key={d} className="text-center text-xs font-semibold text-gray-500 py-2">
+        {d}
+      </div>
+    ));
+
+    // Empty slots for first week
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="h-24 sm:h-32 border-t border-r border-gray-100 bg-gray-50/30"></div>);
+    }
+
+    // Days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayWorkouts = monthWorkouts.filter(w => w.date === dateStr);
+      const isToday = new Date().toDateString() === new Date(currentYear, currentMonth, day).toDateString();
+
+      days.push(
+        <div 
+          key={day} 
+          onClick={() => handleDayClick(day)}
+          className={`h-24 sm:h-32 border-t border-r border-gray-100 p-1 transition-colors cursor-pointer hover:bg-blue-50 relative group ${isToday ? 'bg-blue-50/50' : ''}`}
+        >
+          <span className={`text-xs font-medium ml-1 ${isToday ? 'bg-blue-600 text-white w-5 h-5 flex items-center justify-center rounded-full' : 'text-gray-700'}`}>
+            {day}
+          </span>
+          <div className="mt-1 space-y-1 overflow-y-auto max-h-[80%] scrollbar-hide">
+            {dayWorkouts.map(w => (
+              <div key={w.id} className="text-[10px] sm:text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded flex items-center gap-1 truncate">
+                <Dumbbell size={10} /> {w.type}
+              </div>
+            ))}
+          </div>
+          <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Plus size={14} className="text-blue-400" />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-7 border-l border-b border-gray-100 rounded-lg overflow-hidden bg-white shadow-sm">
+        {headers}
+        {days}
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-8 font-sans text-gray-900">
+      <div className="max-w-5xl mx-auto">
+        
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <CheckCircle2 className="text-blue-600" /> 운동 트래커
+            </h1>
+            <p className="text-gray-500 mt-1">당신의 꾸준함을 기록하세요.</p>
+          </div>
+          
+          <div className="flex items-center bg-white rounded-xl shadow-sm border border-gray-200 p-1">
+            <button onClick={handlePrevMonth} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <ChevronLeft size={20} />
+            </button>
+            <div className="px-4 font-semibold min-w-32 text-center">
+              {formatMonth(currentDate)}
+            </div>
+            <button onClick={handleNextMonth} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+            <div className="p-3 bg-blue-100 text-blue-600 rounded-xl">
+              <CalendarIcon size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">이번 달 운동</p>
+              <p className="text-2xl font-bold">{workoutCount}회</p>
+            </div>
+          </div>
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+            <div className="p-3 bg-orange-100 text-orange-600 rounded-xl">
+              <Clock size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">누적 운동 시간</p>
+              <p className="text-2xl font-bold">{totalDuration}분</p>
+            </div>
+          </div>
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
+            <div className="p-3 bg-green-100 text-green-600 rounded-xl">
+              <Flame size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">운동 강도 점수</p>
+              <p className="text-2xl font-bold">Good 🔥</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Calendar View */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <BarChart3 size={20} className="text-blue-500" /> 월간 리포트
+            </h2>
+            <div className="flex gap-4 text-xs text-gray-500">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-indigo-100 rounded"></div> 운동 완료
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 bg-blue-50 rounded border border-gray-100"></div> 오늘
+              </div>
+            </div>
+          </div>
+          {renderCalendar()}
+        </div>
+
+        {/* Recent Activity List (Mobile Friendly) */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+            <h3 className="font-semibold">최근 운동 기록</h3>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {monthWorkouts.length === 0 ? (
+              <div className="p-8 text-center text-gray-400 italic">
+                이번 달 기록이 없습니다. 달력 날짜를 클릭해 추가해보세요!
+              </div>
+            ) : (
+              monthWorkouts.slice().reverse().map(w => (
+                <div key={w.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                      <Dumbbell size={20} />
+                    </div>
+                    <div>
+                      <p className="font-medium">{w.type}</p>
+                      <p className="text-xs text-gray-500">{w.date} • {w.duration}분 • 강도 {w.intensity}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); deleteWorkout(w.id); }}
+                    className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Add Workout Modal */}
+        {isModalOpen && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-bold">{currentMonth + 1}월 {selectedDay}일 운동 기록</h3>
+                  <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                    <ChevronRight className="rotate-90" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">운동 종류</label>
+                    <select 
+                      value={newWorkout.type}
+                      onChange={(e) => setNewWorkout({...newWorkout, type: e.target.value})}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    >
+                      <option>웨이트</option>
+                      <option>유산소 (러닝/사이클)</option>
+                      <option>수영</option>
+                      <option>요가/필라테스</option>
+                      <option>구기종목</option>
+                      <option>기타</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">시간 (분)</label>
+                      <input 
+                        type="number"
+                        value={newWorkout.duration}
+                        onChange={(e) => setNewWorkout({...newWorkout, duration: e.target.value})}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">강도</label>
+                      <select 
+                        value={newWorkout.intensity}
+                        onChange={(e) => setNewWorkout({...newWorkout, intensity: e.target.value})}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                      >
+                        <option>가볍게</option>
+                        <option>보통</option>
+                        <option>힘듦</option>
+                        <option>매우 힘듦</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">메모</label>
+                    <textarea 
+                      placeholder="오늘 운동은 어땠나요?"
+                      value={newWorkout.memo}
+                      onChange={(e) => setNewWorkout({...newWorkout, memo: e.target.value})}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none transition-all h-24 resize-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-8 flex gap-3">
+                  <button 
+                    onClick={() => setIsModalOpen(false)}
+                    className="flex-1 px-4 py-3 border border-gray-200 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+                  >
+                    취소
+                  </button>
+                  <button 
+                    onClick={addWorkout}
+                    className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95"
+                  >
+                    기록 저장
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default App;
